@@ -154,3 +154,98 @@ def Orthonormal2Spherical(x,y,
     mualpha_mudelta_corr = CovarianceMatrix_ad[:,0,1]/(mualphastar_error*mudelta_error)
     
     return alphadeg,deltadeg,mualphastar,mudelta,mualphastar_error,mudelta_error, mualpha_mudelta_corr
+
+
+
+def ComputeVrVphi_uncertainties(x,y,mux,muy,
+                                vx,vy,vz,ideg,Omegadeg,
+                                mux_error=None,muy_error=None,mux_muy_corr=None) :
+    
+    '''Given bulk motion/structure parameters derive rotation velocities and uncertainties
+
+    See appendix of DR2 demo paper for mathematical details 
+
+    N.B. Error in eq. B.21 of DR2 paper, which is now corrected in this code
+
+    Inputs: 
+        alphadeg,deltadeg:  Positions (RA,dec in degrees)
+        mu_alpha,mu_delta: proper motions (pmra,pmdec -- mas/yr)
+        a0deg,d0deg: Centre of LMC
+        vx,vy,vz: Bulk velocity of LMC (units: mas/yr). vz is line-of-sight so conversion is at assumed distance
+        ideg,Omegadeg: inclination & orientation of disc (degrees)
+
+
+    Outputs: 
+        R (radians), phi (radians), vR (mas/yr), vt (mas/yr),
+        vR_error (mas/yr), vt_error (mas/yr),
+        vR_vt_corr (unit-free)
+
+    vR/vt are in the same units as the input proper motion components.
+    '''
+
+    i = np.deg2rad(ideg)
+    Omega = np.deg2rad(Omegadeg)
+    a = np.tan(i)*np.cos(Omega)
+    b = -np.tan(i)*np.sin(Omega)
+    
+    lx,mx,nx = np.sin(Omega),-np.cos(i)*np.cos(Omega),np.sin(i)*np.cos(Omega)
+    ly,my,ny = np.cos(Omega),np.cos(i)*np.sin(Omega),-np.sin(i)*np.sin(Omega)
+    lz,mz,nz = 0.0,np.sin(i),np.cos(i)
+
+    z = np.sqrt(1.-x*x-y*y)
+    
+    Xi = (lx*x+ly*y)/(z+a*x+b*y) 
+    Eta = ( (mx-a*mz)*x + (my-b*mz)*y ) / (z + a*x + b*y)
+    R = np.sqrt(Xi*Xi+Eta*Eta)
+    
+    XiDotEtaDot2MuxMuyMatrix = np.zeros([len(x),2,2])
+    
+    XiDotEtaDot2MuxMuyMatrix[:,0,0] = (lx - x*(lx*x + ly*y)   )*(a*x+b*y+z)
+    XiDotEtaDot2MuxMuyMatrix[:,0,1] = (mx - x*(mx*x+my*y+mz*z))*(a*x+b*y+z)
+    XiDotEtaDot2MuxMuyMatrix[:,1,0] = (ly - y*(lx*x + ly*y)   )*(a*x+b*y+z)
+    XiDotEtaDot2MuxMuyMatrix[:,1,1] = (my - y*(mx*x+my*y+mz*z))*(a*x+b*y+z)
+
+    Determinant = (XiDotEtaDot2MuxMuyMatrix[:,0,0]*XiDotEtaDot2MuxMuyMatrix[:,1,1] 
+                   - XiDotEtaDot2MuxMuyMatrix[:,1,0]*XiDotEtaDot2MuxMuyMatrix[:,0,1] )
+    
+    MuxMuy2XiDotEtaDotMatrix = np.zeros([len(x),2,2])
+    
+    MuxMuy2XiDotEtaDotMatrix[:,0,0] = XiDotEtaDot2MuxMuyMatrix[:,1,1]/Determinant
+    MuxMuy2XiDotEtaDotMatrix[:,0,1] = -XiDotEtaDot2MuxMuyMatrix[:,0,1]/Determinant
+    MuxMuy2XiDotEtaDotMatrix[:,1,0] = -XiDotEtaDot2MuxMuyMatrix[:,1,0]/Determinant
+    MuxMuy2XiDotEtaDotMatrix[:,1,1] = XiDotEtaDot2MuxMuyMatrix[:,0,0]/Determinant
+    
+
+    mu_xy = np.vstack([ mux + (-vx + x*(vx*x+vy*y+vz*z)) * (a*x+b*y+z),
+                        muy + (-vy + y*(vx*x+vy*y+vz*z)) * (a*x+b*y+z) ] ).T
+    
+    
+    XiDotEtaDot2vRvtMatrix = np.zeros([len(x),2,2])
+    XiDotEtaDot2vRvtMatrix[:,0,0] = Xi/R
+    XiDotEtaDot2vRvtMatrix[:,0,1] = Eta/R
+    XiDotEtaDot2vRvtMatrix[:,1,0] = -Eta/R
+    XiDotEtaDot2vRvtMatrix[:,1,1] = Xi/R
+
+    MuxMuy2vRvtMatrix = np.einsum('lij,ljk->lik', XiDotEtaDot2vRvtMatrix, MuxMuy2XiDotEtaDotMatrix)
+    vRvt = np.einsum('lij,lj->li', MuxMuy2vRvtMatrix, mu_xy)
+    
+    if mux_error is None or muy_error is None or mux_muy_corr :
+        return R, np.arctan2(Eta,Xi), vRvt[:,0], vRvt[:,1]
+
+    CovarianceMatrix = np.zeros((len(x),2,2))
+    CovarianceMatrix[:,0,0] = mux_error**2
+    CovarianceMatrix[:,1,1] = muy_error**2
+    CovarianceMatrix[:,0,1] = mux_muy_corr*mux_error*muy_error
+    CovarianceMatrix[:,1,0] = CovarianceMatrix[:,0,1]
+
+    # C' = R C R^T
+    # Multiply by TRANSPOSE of R (hence ij,kj not ij,jk)
+    CovarianceMatrix_vRvt = np.einsum('lij,lkj->lik', CovarianceMatrix, MuxMuy2vRvtMatrix)
+    # Multiply by R
+    CovarianceMatrix_vRvt = np.einsum('lij,ljk->lik', MuxMuy2vRvtMatrix, CovarianceMatrix_vRvt)
+    
+    vR_error = np.sqrt(CovarianceMatrix_vRvt[:,0,0])
+    vt_error = np.sqrt(CovarianceMatrix_vRvt[:,1,1])
+    vR_vt_corr = CovarianceMatrix_vRvt[:,0,1]/(vR_error*vt_error)
+    return R, np.arctan2(Eta,Xi), vRvt[:,0], vRvt[:,1], vR_error, vt_error, vR_vt_corr
+
