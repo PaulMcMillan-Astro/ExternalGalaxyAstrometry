@@ -1,2 +1,2 @@
-from _AngleConversions import *
-from _GeometricFitting import *
+from ._AngleConversions import *
+from ._GeometricFitting import findGradientsParametersFromData
