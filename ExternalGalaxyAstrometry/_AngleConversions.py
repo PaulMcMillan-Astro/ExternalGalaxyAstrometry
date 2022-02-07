@@ -1,7 +1,9 @@
 import numpy as np
 
-a0vdM = 78.76 # a0 from van der Marel & Kallivayalil (2014) average of H I values 
-d0vdM = -69.19 # d0 from van der Marel & Kallivayalil (2014) average of H I values 
+a0vdM = 78.76 
+'''a0 from van der Marel & Kallivayalil (2014) average of H I values'''
+d0vdM = -69.19 
+'''d0 from van der Marel & Kallivayalil (2014) average of H I values'''
 
 
 
@@ -157,9 +159,9 @@ def Orthonormal2Spherical(x,y,
 
 
 
-def ComputeVrVphi_uncertainties(x,y,mux,muy,
-                                vx,vy,vz,ideg,Omegadeg,
-                                mux_error=None,muy_error=None,mux_muy_corr=None) :
+def Orthonormal2Internal(x,y,mux,muy,
+                         vx,vy,vz,ideg,Omegadeg,
+                         mux_error=None,muy_error=None,mux_muy_corr=None) :
     
     '''Given bulk motion/structure parameters derive rotation velocities and uncertainties
 
@@ -168,16 +170,17 @@ def ComputeVrVphi_uncertainties(x,y,mux,muy,
     N.B. Error in eq. B.21 of DR2 paper, which is now corrected in this code
 
     Inputs: 
-        alphadeg,deltadeg:  Positions (RA,dec in degrees)
-        mu_alpha,mu_delta: proper motions (pmra,pmdec -- mas/yr)
-        a0deg,d0deg: Centre of LMC
+        x,y: angular positions
+        mux,muy: proper motions in x,y directions (if given as input)
         vx,vy,vz: Bulk velocity of LMC (units: mas/yr). vz is line-of-sight so conversion is at assumed distance
         ideg,Omegadeg: inclination & orientation of disc (degrees)
+        mux_error,muy_error,mux_muy_corr: uncertainties & correlation coefficient in proper motions (if given as input)
 
 
     Outputs: 
         R (radians), phi (radians), vR (mas/yr), vt (mas/yr),
-        vR_error (mas/yr), vt_error (mas/yr),
+        (if mux_error, muy_error, mux_mu_corr given as input, also:)
+        vR_error (mas/yr), vt_error (mas/yr), 
         vR_vt_corr (unit-free)
 
     vR/vt are in the same units as the input proper motion components.
