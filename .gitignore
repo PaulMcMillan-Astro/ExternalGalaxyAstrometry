@@ -3,3 +3,5 @@ dist
 *.egg-info
 ExternalGalaxyAstrometry/__pycache__
 LMCUtilsEDR3.py
+.vscode
+docs/build/
