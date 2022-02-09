@@ -1,4 +1,4 @@
-'''Tools to analyse data with proper motions under the assumption that they are drawn 
+'''Tools to analyse data with proper motions under the assumption that they are drawn
 from an external rotating disc galaxy.'''
 from ._AngleConversions import *
 from ._GeometricFitting import findGradientsParametersFromData
@@ -7,9 +7,9 @@ from ._GeometricFitting import findGradientsParametersFromData
 def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
                              adjustForCorrelations=True,
                              defaultParallaxCut=5.,  # parallax/parallax_error < defaultParallaxCut
-                             defaultPMChiSq=9.21,  # chi square for proper motions. 9.21 correponds to 99% confidence interval
+                             defaultPMChiSq=9.21,  # chi square for pm.: 9.21 -> 99% CI
                              defaultMagnitudeCut=20.,  # Magnitude cut for final sample
-                             defaultMagnitudeCutInitialFilter=19.,  # Magnitude cut for initial sample
+                             defaultMagnitudeCutInitialFilter=19.,  # Magnitude cut ini. sample
                              defaultRadiusCutInitialFilter=np.sin(
                                  np.deg2rad(3))  # Radius cut for initial sample
                              ):
@@ -25,7 +25,7 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
 
     maskpickpmLMC = maskparallaxLMC & maskbrightishLMC & maskposition
 
-    #pmxLMC0, pmyLMC0, findMedianRobustCovariance(mux[maskpickpmLMC], muy[maskpickpmLMC])
+    # pmxLMC0, pmyLMC0, findMedianRobustCovariance(mux[maskpickpmLMC], muy[maskpickpmLMC])
     pmxLMC0 = np.median()
     pmyLMC0 = np.median(muy[maskpickpmLMC])
 
@@ -79,7 +79,8 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
 
     # np.array(data.pmdec)
     _, _, LLmux, LLmuy = Spherical2Orthonormal(np.array(data.ra), np.array(data.dec),
-                                               np.array(data.pmra_decorr), np.array(data.pmdec_decorr))
+                                               np.array(data.pmra_decorr),
+                                               np.array(data.pmdec_decorr))
 
     data['mux_decorr'] = LLmux
     data['muy_decorr'] = LLmuy
@@ -110,7 +111,8 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
 
     dpmx_decorr = np.array(data['mux_decorr']-pmxLMC0_decorr)
     dpmy_decorr = np.array(data['muy_decorr']-pmyLMC0_decorr)
-    maskpmLMC_decorr = ((dpmx_decorr*dpmx_decorr*icovar_decorr[0][0] + 2*dpmx_decorr*dpmy_decorr*icovar_decorr[0][1]
+    maskpmLMC_decorr = ((dpmx_decorr*dpmx_decorr*icovar_decorr[0][0]
+                         + 2*dpmx_decorr*dpmy_decorr*icovar_decorr[0][1]
                          + dpmy_decorr*dpmy_decorr*icovar_decorr[1][1]) < defaultPMChiSq)
     pmxcov, pmycov, pmcov, dpmx, dpmy = [], [], [], [], []
     maskMagnitudeFinal = (data['phot_g_mean_mag'] < defaultMagnitudeCut)
