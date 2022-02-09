@@ -99,16 +99,16 @@ def Spherical2Orthonormal_pandas(data, alpha0deg=a0vdM, delta0deg=d0vdM,
 def Orthonormal2Spherical(x, y,
                           mux=None, muy=None,
                           mux_error=None, muy_error=None, mux_muy_corr=None,
-                          alpha0deg=a0vdM, delta0deg=d0vdM) :
+                          alpha0deg=a0vdM, delta0deg=d0vdM):
     """Converts angular position and proper motion from convenient local form
 
-    Input positions in radians, outputs in degrees. Proper motion in mas/yr 
+    Input positions in radians, outputs in degrees. Proper motion in mas/yr
     (though I suppose pm units are unimportant).
-    Conversion is to orthonormal x,y coordinates following eqs. 2 from DR2 
+    Conversion is to orthonormal x,y coordinates following eqs. 2 from DR2
     demo paper
 
     Default alpha0, delta0 values (centre) from van der Marel &
-    Kallivayalil (2014) 
+    Kallivayalil (2014)
     """
 
     lambda0 = np.deg2rad(alpha0deg)
@@ -143,7 +143,8 @@ def Orthonormal2Spherical(x, y,
     RotationMatrix[:, 1, 0] = sind0*sinda
     RotationMatrix[:, 1, 1] = (cosd*cosd0+sind*sind0*cosda)
 
-    Determinant = RotationMatrix[:, 0, 0]*RotationMatrix[:, 1, 1]-RotationMatrix[:, 0, 1]*RotationMatrix[:, 1, 0]
+    Determinant = RotationMatrix[:, 0, 0]*RotationMatrix[:, 1, 1] \
+        - RotationMatrix[:, 0, 1]*RotationMatrix[:, 1, 0]
     # If it was really a rotation matrix the inverse would just be the transpose.
     InverseRotationMatrix = np.zeros((len(mux), 2, 2))
     InverseRotationMatrix[:, 0, 0] = RotationMatrix[:, 1, 1]/Determinant
@@ -168,7 +169,7 @@ def Orthonormal2Spherical(x, y,
     # There may be a quicker way of doing this
     # C' = R C R^T
     # Multiply by TRANSPOSE of R (hence ij, kj not ij, jk)
-    CovarianceMatrix_ad = np.einsum('lij,lkj->lik', CovarianceMatrix, 
+    CovarianceMatrix_ad = np.einsum('lij,lkj->lik', CovarianceMatrix,
                                     InverseRotationMatrix)
     # Multiply by R
     CovarianceMatrix_ad = np.einsum('lij,ljk->lik',  InverseRotationMatrix,
@@ -185,7 +186,7 @@ def Orthonormal2Internal(x, y, mux, muy,
                          vx, vy, vz, ideg, Omegadeg,
                          mux_error=None, muy_error=None, mux_muy_corr=None):
 
-    '''Given bulk motion/structure parameters derive rotation velocities 
+    '''Given bulk motion/structure parameters derive rotation velocities
     and uncertainties
 
     See appendix of DR2 demo paper for mathematical details
@@ -199,7 +200,7 @@ def Orthonormal2Internal(x, y, mux, muy,
         vx,vy,vz: Bulk velocity of LMC (units: mas/yr). vz is line-of-sight so
             conversion is at assumed distance
         ideg,Omegadeg: inclination & orientation of disc (degrees)
-        mux_error,muy_error,mux_muy_corr: uncertainties & correlation 
+        mux_error,muy_error,mux_muy_corr: uncertainties & correlation
             coefficient in proper motions (if given as input)
 
 
@@ -207,7 +208,7 @@ def Orthonormal2Internal(x, y, mux, muy,
     -------
         R (radians), phi (radians), vR (mas/yr), vt (mas/yr),
         (if mux_error, muy_error, mux_mu_corr given as input, also:)
-        vR_error (mas/yr), vt_error (mas/yr), 
+        vR_error (mas/yr), vt_error (mas/yr),
         vR_vt_corr (unit-free)
 
     vR/vt are in the same units as the input proper motion components.
@@ -224,7 +225,7 @@ def Orthonormal2Internal(x, y, mux, muy,
 
     z = np.sqrt(1.-x*x-y*y)
 
-    Xi = (lx*x+ly*y)/(z+a*x+b*y) 
+    Xi = (lx*x+ly*y)/(z+a*x+b*y)
     Eta = ((mx-a*mz)*x + (my-b*mz)*y) / (z + a*x + b*y)
     R = np.sqrt(Xi*Xi+Eta*Eta)
 

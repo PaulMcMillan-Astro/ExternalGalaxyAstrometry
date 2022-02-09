@@ -3,7 +3,7 @@ import setuptools
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
-    
+
 setuptools.setup(
     name="ExternalGalaxyAstrometry",
     version="0.1",
@@ -14,7 +14,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url='https://github.com/PaulMcMillan-Astro/ExternalGalaxyAstrometry',
     python_requires='>=3',
-    install_requires=["numpy","scipy","pandas"],
+    install_requires=["numpy", "scipy", "pandas"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Science/Research",
