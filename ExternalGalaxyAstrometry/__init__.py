@@ -4,6 +4,24 @@ from ._AngleConversions import *
 from ._GeometricFitting import findGradientsParametersFromData
 
 
+def findMedianRobustCovariance(mux, muy):
+    '''Provides medians and a robust estimate of the covariance matrix of two input arrays'''
+    pmx0 = np.median(mux)
+    pmy0 = np.median(muy)
+
+    percentilesx = np.percentile(mux, [10, 90])
+    percentilesy = np.percentile(muy, [10, 90])
+    RSEx = 0.390152*(percentilesx[1]-percentilesx[0])
+    RSEy = 0.390152*(percentilesy[1]-percentilesy[0])
+    maskPMRSE = ((np.absolute(mux-pmx0) < 4*RSEx) &
+                 (np.absolute(muy-pmy0) < 4*RSEy))
+    pmxcov = (mux)[maskPMRSE]
+    pmycov = (muy)[maskPMRSE]
+    pmcov = np.row_stack((pmxcov, pmycov))
+    covar = np.cov(pmcov)
+    return pmx0, pmy0, covar
+
+
 def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
                              adjustForCorrelations=True,
                              defaultParallaxCut=5.,  # parallax/parallax_error < defaultParallaxCut
@@ -11,7 +29,8 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
                              defaultMagnitudeCut=20.,  # Magnitude cut for final sample
                              defaultMagnitudeCutInitialFilter=19.,  # Magnitude cut ini. sample
                              defaultRadiusCutInitialFilter=np.sin(
-                                 np.deg2rad(3))  # Radius cut for initial sample
+                                 np.deg2rad(3)),  # Radius cut for initial sample
+                             verbose=False
                              ):
     '''This function needs a lot of explaining'''
     x, y, mux, muy = Spherical2Orthonormal_pandas(
@@ -25,69 +44,51 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
 
     maskpickpmLMC = maskparallaxLMC & maskbrightishLMC & maskposition
 
-    # pmxLMC0, pmyLMC0, findMedianRobustCovariance(mux[maskpickpmLMC], muy[maskpickpmLMC])
-    pmxLMC0 = np.median()
-    pmyLMC0 = np.median(muy[maskpickpmLMC])
-
-    # find Robust scatter estimate (RSE)
-    # RSE is 0.39 * [(90th percentile) - (10th percentile)]
-    # For a Gaussian it is the same the standard deviation (but it is more robust to outliers)
-
-    percentilesx = np.percentile(data[maskpickpmLMC]['mux'], [10, 90])
-    percentilesy = np.percentile(data[maskpickpmLMC]['muy'], [10, 90])
-    RSEx = 0.390152*(percentilesx[1]-percentilesx[0])
-    RSEy = 0.390152*(percentilesy[1]-percentilesy[0])
-    maskPMRSE = ((np.absolute(data[maskpickpmLMC]['mux']-pmxLMC0) < 4*RSEx) &
-                 (np.absolute(data[maskpickpmLMC]['muy']-pmyLMC0) < 4*RSEy))
-    pmxcov = (data[maskpickpmLMC]['mux'])[maskPMRSE]
-    pmycov = (data[maskpickpmLMC]['muy'])[maskPMRSE]
-    pmcov = np.row_stack((pmxcov, pmycov))
-    covar = np.cov(pmcov)
+    pmxLMC0, pmyLMC0, covar = findMedianRobustCovariance(mux[maskpickpmLMC], muy[maskpickpmLMC])
     icovar = np.linalg.inv(covar)
 
-    print('Covarience matrix for proper motions (x & y)')
-    print(covar)
+    if verbose:
+        print('Covarience matrix for proper motions (x & y)')
+        print(covar)
 
-    dpmx = np.array(data['mux']-pmxLMC0)
-    dpmy = np.array(data['muy']-pmyLMC0)
+    dpmx = np.array(mux-pmxLMC0)
+    dpmy = np.array(muy-pmyLMC0)
     maskpmLMC = ((dpmx*dpmx*icovar[0][0] + 2*dpmx*dpmy*icovar[0]
                  [1] + dpmy*dpmy*icovar[1][1]) < defaultPMChiSq)
 
-    pmxcov, pmycov, pmcov, dpmx, dpmy = [], [], [], [], []
+    dpmx, dpmy = [], [], [], [], []
 
-    print(len(data[maskpmLMC]), ' stars fit initial proper motion cuts')
-    maskposition = ((data['x']*data['x'] + data['y']*data['y'] <
-                    defaultRadiusCutInitialFilter*defaultRadiusCutInitialFilter))
+    if verbose:
+        print(len(data[maskpmLMC]), ' stars fit initial proper motion cuts')
+    maskposition = (x**2+y**2 < defaultRadiusCutInitialFilter**2)
     maskmag = data['phot_g_mean_mag'] < defaultMagnitudeCutInitialFilter
     maskmyLMC = (maskparallaxLMC & maskpmLMC) & maskposition & maskmag
     median_parallax = np.median(np.array(data[maskmyLMC]['parallax']))
+    if verbose:
+        print('median parallax of stars after initial filter:', median_parallax, 'mas')
 
-    print('median parallax of stars in LMC:', median_parallax, 'mas')
+    # Return sample if they don't want to remove correlations
 
-    pmra_decorr = (np.array(data.pmra) +
-                   np.array(data.parallax_pmra_corr)*np.array(data.pmra_error) /
-                   np.array(data.parallax_error)
-                   * (median_parallax-np.array(data.parallax)))
+    pmra_decorr = (data.pmra.values +
+                   data.parallax_pmra_corr.values * data.pmra_error.values
+                   / data.parallax_error.values
+                   * (median_parallax-data.parallax.values))
 
-    pmdec_decorr = (np.array(data.pmdec) +
-                    np.array(data.parallax_pmdec_corr)*np.array(data.pmdec_error) /
-                    np.array(data.parallax_error)
-                    * (median_parallax-np.array(data.parallax)))
+    pmdec_decorr = (data.pmdec.values +
+                    data.parallax_pmdec_corr.values*data.pmdec_error.values /
+                    data.parallax_error.values
+                    * (median_parallax-data.parallax.values))
 
-    data['pmra_decorr'] = pmra_decorr
-    data['pmdec_decorr'] = pmdec_decorr
+    _, _, LLmux, LLmuy = Spherical2Orthonormal(data.ra.values, data.dec.values,
+                                               pmra_decorr,
+                                               pmdec_decorr)
 
-    # np.array(data.pmdec)
-    _, _, LLmux, LLmuy = Spherical2Orthonormal(np.array(data.ra), np.array(data.dec),
-                                               np.array(data.pmra_decorr),
-                                               np.array(data.pmdec_decorr))
-
-    data['mux_decorr'] = LLmux
-    data['muy_decorr'] = LLmuy
+    data['mux'] = LLmux
+    data['muy'] = LLmuy
 
     pmra_decorr, pmdec_decorr = [], []
-    LLmux, LLmuy = [], [], [], []
-
+    LLmux, LLmuy = [], []
+    # TK replace with above function
     pmxLMC0_decorr = np.median(data[maskpickpmLMC]['mux_decorr'])
     pmyLMC0_decorr = np.median(data[maskpickpmLMC]['muy_decorr'])
 

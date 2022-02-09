@@ -86,6 +86,34 @@ def Spherical2Orthonormal(alphadeg, deltadeg,
 
 def Spherical2Orthonormal_pandas(data, alpha0deg=a0vdM, delta0deg=d0vdM,
                                  convertUncertainties=True):
+    '''Function to apply the transformation Spherical2Orthonormal to data given in a
+    pandas dataframe
+
+
+    Parameters
+    ----------
+    data: pandas DataFrame
+        Dataframe containing (at least) columns 'ra', 'dec', 'pmra', 'pmdec'.
+        If convertUncertainties is True then it must also contain 'pmra_error',
+        'pmdec_error' and 'pmra_pmdec_corr'
+    alpha0deg: float, default a0vdM
+        Centre of the galaxy in right accension
+    delta0deg: float, default d0vdM
+        Centre of the galaxy in declination
+    convertUncertainties: bool, default True
+        If true, uncertainties are also converted to orthonormal coordinates
+
+    Returns
+    -------
+    x,y: numpy array
+        Angular positions in orthonormal coordinates [radians]
+    mux,muy: numpy array
+        Proper motions in in orthonormal coordinate x,y directions
+    mux_error,muy_error,mux_muy_corr: numpy array [optional]
+        Uncertainties & correlation coefficient in proper motions (if given as input)
+
+
+    '''
     if convertUncertainties:
         return Spherical2Orthonormal(data.ra, data.dec, data.pmra, data.pmdec,
                                      data.pmra_error, data.pmdec_error,
@@ -185,7 +213,6 @@ def Orthonormal2Spherical(x, y,
 def Orthonormal2Internal(x, y, mux, muy,
                          vx, vy, vz, ideg, Omegadeg,
                          mux_error=None, muy_error=None, mux_muy_corr=None):
-
     '''Given bulk motion/structure parameters derive rotation velocities
     and uncertainties
 
