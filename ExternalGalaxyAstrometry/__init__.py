@@ -89,26 +89,14 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
     pmra_decorr, pmdec_decorr = [], []
     LLmux, LLmuy = [], []
     # TK replace with above function
-    pmxLMC0_decorr = np.median(data[maskpickpmLMC]['mux_decorr'])
-    pmyLMC0_decorr = np.median(data[maskpickpmLMC]['muy_decorr'])
 
-    # find RSE
-    percentilesx = np.percentile(data[maskpickpmLMC]['mux_decorr'], [10, 90])
-    percentilesy = np.percentile(data[maskpickpmLMC]['muy_decorr'], [10, 90])
-    RSEx = 0.390152*(percentilesx[1]-percentilesx[0])
-    RSEy = 0.390152*(percentilesy[1]-percentilesy[0])
-    maskPMRSE = ((np.absolute(data[maskpickpmLMC]['mux_decorr']-pmxLMC0) < 4*RSEx) &
-                 (np.absolute(data[maskpickpmLMC]['muy_decorr']-pmyLMC0) < 4*RSEy))
-    pmxcov = (data[maskpickpmLMC]['mux_decorr'])[maskPMRSE]
-    pmycov = (data[maskpickpmLMC]['muy_decorr'])[maskPMRSE]
-    # plt.hist(dpma,np.arange(-3,3,0.1),normed=True)
-    # plt.plot(np.arange(-3,3,0.1),Gau(np.arange(-3,3,0.1),0,np.sqrt(0.214)),'--')
-    pmcov = np.row_stack((pmxcov, pmycov))
-    covar_decorr = np.cov(pmcov)
+    pmxLMC0_decorr, pmyLMC0_decorr, covar_decorr = findMedianRobustCovariance(data[maskpickpmLMC]['mux'],
+                                                                              data[maskpickpmLMC]['muy'])
+    
     icovar_decorr = np.linalg.inv(covar_decorr)
-
-    print('Covarience matrix for proper motions (corrected x & y)')
-    print(covar_decorr)
+    if verbose: 
+        print('Covarience matrix for proper motions (corrected x & y)')
+        print(covar_decorr)
 
     dpmx_decorr = np.array(data['mux_decorr']-pmxLMC0_decorr)
     dpmy_decorr = np.array(data['muy_decorr']-pmyLMC0_decorr)
