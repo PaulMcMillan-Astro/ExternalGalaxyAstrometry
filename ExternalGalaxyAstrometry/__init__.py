@@ -37,13 +37,10 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
 
     x, y, mux, muy = Spherical2Orthonormal_pandas(data, alpha0deg=a0, delta0deg=d0,
                                                   convertUncertainties=False)
-    # mask on parallax/parallax_error
+    # masks for initial sample to estimate proper motion covariance
     maskparallaxLMC = ((data.parallax)/(data.parallax_error) < defaultParallaxCut)
-    # mask on default radius cut (restrict to LMC dominated region)
     maskposition = ((x**2 + y**2 < defaultRadiusCutInitialFilter*defaultRadiusCutInitialFilter))
-    # mask anything too faint (again, reduces contamination because these have large uncertainties)
     maskbrightishLMC = data.phot_g_mean_mag < defaultMagnitudeCutInitialFilter
-
     maskpickpmLMC = maskparallaxLMC & maskbrightishLMC & maskposition
 
     pmxLMC0, pmyLMC0, covar = findMedianRobustCovariance(mux[maskpickpmLMC], muy[maskpickpmLMC])
@@ -60,8 +57,10 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
 
     if verbose:
         print(len(data[maskpmLMC]), ' stars fit initial proper motion cuts')
+
     maskposition = (x**2+y**2 < defaultRadiusCutInitialFilter**2)
     maskmag = data['phot_g_mean_mag'] < defaultMagnitudeCutInitialFilter
+    maskMagnitudeFinal = (data['phot_g_mean_mag'] < defaultMagnitudeCut)
     maskmyLMC = (maskparallaxLMC & maskpmLMC) & maskposition & maskmag
     median_parallax = np.median(np.array(data[maskmyLMC]['parallax']))
     if verbose:
@@ -71,7 +70,7 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
     if decorrelate is False:
         data['mux'] = mux
         data['muy'] = muy
-        return data
+        return data[maskmyLMC]
 
     pmra_decorr = (data.pmra.values +
                    data.parallax_pmra_corr.values * data.pmra_error.values
@@ -103,7 +102,7 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
     maskpmLMC = ((dpmx*dpmx*icovar[0][0] + 2*dpmx*dpmy*icovar[0][1]
                   + dpmy*dpmy*icovar[1][1]) < defaultPMChiSq)
 
-    maskMagnitudeFinal = (data['phot_g_mean_mag'] < defaultMagnitudeCut)
+    
     maskLMCfinal = maskparallaxLMC & maskpmLMC & maskMagnitudeFinal
 
     if verbose:
@@ -111,4 +110,4 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
 
     data['mux'] = mux
     data['muy'] = muy
-    return data
+    return data[maskLMCfinal]
