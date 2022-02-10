@@ -30,11 +30,13 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
                              defaultMagnitudeCutInitialFilter=19.,  # Magnitude cut ini. sample
                              defaultRadiusCutInitialFilter=np.sin(
                                  np.deg2rad(3)),  # Radius cut for initial sample
+                             decorrelate=True,
                              verbose=False
                              ):
     '''This function needs a lot of explaining'''
-    x, y, mux, muy = Spherical2Orthonormal_pandas(
-        data, alpha0deg=a0, delta0deg=d0, convertUncertainties=False)
+
+    x, y, mux, muy = Spherical2Orthonormal_pandas(data, alpha0deg=a0, delta0deg=d0,
+                                                  convertUncertainties=False)
     # mask on parallax/parallax_error
     maskparallaxLMC = ((data.parallax)/(data.parallax_error) < defaultParallaxCut)
     # mask on default radius cut (restrict to LMC dominated region)
@@ -56,8 +58,6 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
     maskpmLMC = ((dpmx*dpmx*icovar[0][0] + 2*dpmx*dpmy*icovar[0]
                  [1] + dpmy*dpmy*icovar[1][1]) < defaultPMChiSq)
 
-    dpmx, dpmy = [], [], [], [], []
-
     if verbose:
         print(len(data[maskpmLMC]), ' stars fit initial proper motion cuts')
     maskposition = (x**2+y**2 < defaultRadiusCutInitialFilter**2)
@@ -68,6 +68,10 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
         print('median parallax of stars after initial filter:', median_parallax, 'mas')
 
     # Return sample if they don't want to remove correlations
+    if decorrelate is False:
+        data['mux'] = mux
+        data['muy'] = muy
+        return data
 
     pmra_decorr = (data.pmra.values +
                    data.parallax_pmra_corr.values * data.pmra_error.values
@@ -79,32 +83,32 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
                     data.parallax_error.values
                     * (median_parallax-data.parallax.values))
 
-    _, _, LLmux, LLmuy = Spherical2Orthonormal(data.ra.values, data.dec.values,
-                                               pmra_decorr,
-                                               pmdec_decorr)
-
-    data['mux'] = LLmux
-    data['muy'] = LLmuy
+    _, _, mux, muy = Spherical2Orthonormal(data.ra.values, data.dec.values,
+                                           pmra_decorr,
+                                           pmdec_decorr)
 
     pmra_decorr, pmdec_decorr = [], []
-    LLmux, LLmuy = [], []
     # TK replace with above function
 
-    pmxLMC0_decorr, pmyLMC0_decorr, covar_decorr = findMedianRobustCovariance(data[maskpickpmLMC]['mux'],
-                                                                              data[maskpickpmLMC]['muy'])
-    
-    icovar_decorr = np.linalg.inv(covar_decorr)
-    if verbose: 
+    pmxLMC0, pmyLMC0, covar = findMedianRobustCovariance(mux[maskpickpmLMC],
+                                                         muy[maskpickpmLMC])
+    icovar = np.linalg.inv(covar)
+
+    if verbose:
         print('Covarience matrix for proper motions (corrected x & y)')
-        print(covar_decorr)
+        print(covar)
 
-    dpmx_decorr = np.array(data['mux_decorr']-pmxLMC0_decorr)
-    dpmy_decorr = np.array(data['muy_decorr']-pmyLMC0_decorr)
-    maskpmLMC_decorr = ((dpmx_decorr*dpmx_decorr*icovar_decorr[0][0]
-                         + 2*dpmx_decorr*dpmy_decorr*icovar_decorr[0][1]
-                         + dpmy_decorr*dpmy_decorr*icovar_decorr[1][1]) < defaultPMChiSq)
-    pmxcov, pmycov, pmcov, dpmx, dpmy = [], [], [], [], []
+    dpmx = mux-pmxLMC0
+    dpmy = muy-pmyLMC0
+    maskpmLMC = ((dpmx*dpmx*icovar[0][0] + 2*dpmx*dpmy*icovar[0][1]
+                  + dpmy*dpmy*icovar[1][1]) < defaultPMChiSq)
+
     maskMagnitudeFinal = (data['phot_g_mean_mag'] < defaultMagnitudeCut)
-    maskLMCfinal = maskparallaxLMC & maskpmLMC_decorr & maskMagnitudeFinal
+    maskLMCfinal = maskparallaxLMC & maskpmLMC & maskMagnitudeFinal
 
-    print(len(data[maskLMCfinal]), 'stars in final sample')
+    if verbose:
+        print(len(data[maskLMCfinal]), 'stars in final sample')
+
+    data['mux'] = mux
+    data['muy'] = muy
+    return data
