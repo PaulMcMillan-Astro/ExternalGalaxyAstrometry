@@ -30,18 +30,19 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
                              defaultMagnitudeCutInitialFilter=19.,  # Magnitude cut ini. sample
                              defaultRadiusCutInitialFilter=np.sin(
                                  np.deg2rad(3)),  # Radius cut for initial sample
-                             decorrelate=True,
                              verbose=False
                              ):
     '''This function needs a lot of explaining'''
 
     x, y, mux, muy = Spherical2Orthonormal_pandas(data, alpha0deg=a0, delta0deg=d0,
                                                   convertUncertainties=False)
+
     # masks for initial sample to estimate proper motion covariance
-    maskparallaxLMC = ((data.parallax)/(data.parallax_error) < defaultParallaxCut)
-    maskposition = ((x**2 + y**2 < defaultRadiusCutInitialFilter*defaultRadiusCutInitialFilter))
-    maskbrightishLMC = data.phot_g_mean_mag < defaultMagnitudeCutInitialFilter
-    maskpickpmLMC = maskparallaxLMC & maskbrightishLMC & maskposition
+    maskIniParallax = ((data.parallax)/(data.parallax_error) < defaultParallaxCut)
+    maskIniPosition = (x**2 + y**2 < defaultRadiusCutInitialFilter**2)
+    maskIniMagnitude = data.phot_g_mean_mag < defaultMagnitudeCutInitialFilter
+    maskFinalMagnitude = (data.phot_g_mean_mag < defaultMagnitudeCut)
+    maskpickpmLMC = maskIniParallax & maskIniMagnitude & maskIniPosition
 
     pmxLMC0, pmyLMC0, covar = findMedianRobustCovariance(mux[maskpickpmLMC], muy[maskpickpmLMC])
     icovar = np.linalg.inv(covar)
@@ -58,18 +59,16 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
     if verbose:
         print(len(data[maskpmLMC]), ' stars fit initial proper motion cuts')
 
-    maskposition = (x**2+y**2 < defaultRadiusCutInitialFilter**2)
-    maskmag = data['phot_g_mean_mag'] < defaultMagnitudeCutInitialFilter
-    maskMagnitudeFinal = (data['phot_g_mean_mag'] < defaultMagnitudeCut)
-    maskmyLMC = (maskparallaxLMC & maskpmLMC) & maskposition & maskmag
+    maskmyLMC = (maskIniParallax & maskpmLMC) & maskIniPosition & maskIniMagnitude
     median_parallax = np.median(np.array(data[maskmyLMC]['parallax']))
     if verbose:
         print('median parallax of stars after initial filter:', median_parallax, 'mas')
 
     # Return sample if they don't want to remove correlations
-    if decorrelate is False:
+    if adjustForCorrelations is False:
         data['mux'] = mux
         data['muy'] = muy
+        maskmyLMC = (maskIniParallax & maskpmLMC) & maskFinalMagnitude
         return data[maskmyLMC]
 
     pmra_decorr = (data.pmra.values +
@@ -87,7 +86,6 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
                                            pmdec_decorr)
 
     pmra_decorr, pmdec_decorr = [], []
-    # TK replace with above function
 
     pmxLMC0, pmyLMC0, covar = findMedianRobustCovariance(mux[maskpickpmLMC],
                                                          muy[maskpickpmLMC])
@@ -102,8 +100,7 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
     maskpmLMC = ((dpmx*dpmx*icovar[0][0] + 2*dpmx*dpmy*icovar[0][1]
                   + dpmy*dpmy*icovar[1][1]) < defaultPMChiSq)
 
-    
-    maskLMCfinal = maskparallaxLMC & maskpmLMC & maskMagnitudeFinal
+    maskLMCfinal = maskIniParallax & maskpmLMC & maskFinalMagnitude
 
     if verbose:
         print(len(data[maskLMCfinal]), 'stars in final sample')
