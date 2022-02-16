@@ -24,15 +24,46 @@ def findMedianRobustCovariance(mux, muy):
 
 def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
                              adjustForCorrelations=True,
-                             defaultParallaxCut=5.,  # parallax/parallax_error < defaultParallaxCut
-                             defaultPMChiSq=9.21,  # chi square for pm.: 9.21 -> 99% CI
-                             defaultMagnitudeCut=20.,  # Magnitude cut for final sample
-                             defaultMagnitudeCutInitialFilter=19.,  # Magnitude cut ini. sample
-                             defaultRadiusCutInitialFilter=np.sin(
-                                 np.deg2rad(3)),  # Radius cut for initial sample
+                             defaultParallaxCut=5.,
+                             defaultPMChiSq=9.21,
+                             defaultMagnitudeCut=20.,
+                             defaultMagnitudeCutInitialFilter=19.,
+                             defaultRadiusCutInitialFilter=np.sin(np.deg2rad(3)),
                              verbose=False
                              ):
-    '''This function needs a lot of explaining'''
+    '''Function which filters data using proper motions
+
+    Parameters
+    ----------
+    data: pandas DataFrame
+        DataFrame containing stars in the region on sky of the galaxy containing (at
+        minimum) the columns described above.
+    a0: float (default a0 for LMC from van der Marel TK)
+        Assumed centre of the galaxy in RA.
+    d0: float (default d0 for LMC from van der Marel TK)
+        Assumed centre of the galaxy in declination.
+    adjustForCorrelations: bool (default True)
+        Adjust proper motions taking into account correlated uncertainties and
+        parallax of the galaxy.
+    defaultParallaxCut: float (default 5.0)
+        remove stars with parallax/parallax_error < defaultParallaxCut as quality filter.
+    defaultPMChiSq: float (default 9.21)
+        Threshold for proper motion cut in terms of intrinsic dispersion (9.21 -> 99% CR).
+    defaultMagnitudeCut: float (default 20.0)
+        Magnitude cut for final sample
+    defaultMagnitudeCutInitialFilter: float (default 19.0)
+        Magnitude cut for initial sample used to define proper motion dispersion.
+    defaultRadiusCutInitialFilter: float (default sin(3 deg))
+        Radius cut for initial sample used to define proper motion dispersion.
+    verbose: bool (default False)
+        Give verbose output.
+
+    Returns
+    -------
+    data: pandas DataFrame
+        The input DataFrame with new columns 'x', 'y', 'mux', 'muy'
+
+    '''
 
     x, y, mux, muy = Spherical2Orthonormal_pandas(data, alpha0deg=a0, delta0deg=d0,
                                                   convertUncertainties=False)
