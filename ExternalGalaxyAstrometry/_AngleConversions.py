@@ -6,6 +6,11 @@ a0vdM = 78.76
 d0vdM = -69.19
 '''d0 from van der Marel & Kallivayalil (2014) average of H I values'''
 
+vlos0vdM = 262.2  # km/s
+D0LMC_Pietrzynski = 49.59  # kc
+# UNITS!
+maskpc2kms = 4.7403885
+
 
 def Spherical2Orthonormal(alphadeg, deltadeg,
                           mualphastar=None, mudelta=None,
