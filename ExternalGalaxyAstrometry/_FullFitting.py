@@ -1,3 +1,5 @@
+from operator import ge
+from pytest import param
 import scipy.optimize
 import numpy as np
 import _AngleConversions
@@ -8,7 +10,8 @@ def RotCurve_alpha(R, v0, r0, alpha):
     return v0/(1.+(r0/R)**alpha)**(1./alpha)
 
 
-def ObjectiveFunctionRotCurve(params, x, y, mux, muy, mux_error, muy_error, mux_muy_corr):
+def ObjectiveFunctionRotCurve_XY(params, fixedParams, varyList,
+                                 x, y, mux, muy, mux_error, muy_error, mux_muy_corr):
     '''Function to minimize to perform a least-squares-like estimate of parameters.
 
     Can be used with minimizing function.
@@ -43,22 +46,29 @@ def ObjectiveFunctionRotCurve(params, x, y, mux, muy, mux_error, muy_error, mux_
     chi_sq: float
         Chi-square like statistic
     '''
+    keylist = ["a0", "d0", "mu_x0", "mu_y0", "mu_z0",
+               "i", "Omega", "v0", "R0", "alpha_RC"]
 
-    mux0, muy0, i, th, v0, R0, alpha_RC = params
-    if R0 < 0.:
+    paramdict = dict(zip(varyList, params))
+    paramdict.update(fixedParams)
+
+    if not all(k in paramdict.keys() for k in keylist):
+        raise ValueError("Input parameters missing from both fixedParams and guessParams: "
+                         + [k not in paramdict.keys() for k in keylist])
+
+    # mux0, muy0, i, th, v0, R0, alpha_RC = params
+    if paramdict['R0'] < 0.:
         return np.inf
 
     Rphi_out = _AngleConversions.Orthonormal2Internal(x, y, mux, muy,
                                                       mux_error, muy_error, mux_muy_corr,
-                                                      mux0, muy0,
-                                                      (_AngleConversions.vlos0vdM
-                                                       / _AngleConversions.maskpc2kms
-                                                       / _AngleConversions.D0LMC_Pietrzynski),
-                                                      i, th)
+                                                      paramdict['mu_x0'], paramdict['mu_y0'],
+                                                      paramdict['mu_z0'],
+                                                      paramdict['i'], paramdict['th'])
     R, phi, vR, vphi, vR_error, vphi_error, vR_vphi_corr = Rphi_out
 
     # Model of average motions in the disc
-    Vphi_mod = RotCurve_alpha(R, v0, R0, alpha_RC)
+    Vphi_mod = RotCurve_alpha(R, paramdict['v0'], paramdict['R0'], paramdict['alpha_RC'])
     VR_mod = 0.*np.ones_like(R)
 
     dv = np.vstack([vR-VR_mod, vphi-Vphi_mod]).T
@@ -74,44 +84,54 @@ def ObjectiveFunctionRotCurve(params, x, y, mux, muy, mux_error, muy_error, mux_
     return chi_sq
 
 
-def fitRotationCurveModel(data, paramdict):
+def fitRotationCurveModel(data, fixedParams, guessParams):
     '''Function which fits data to model of a rotating disc
 
     Parameters
     ----------
     data: pandas DataFrame
         This must contain the columns, ...
-    paramdict:
-        Dictionary containing the parameters decribed above (each either None or fixed value).
+    fixedParams:
+        Dictionary containing the parameters with fixed values and their values
+    guessParams:
+        Dictionary containing parameters to be fit and initial estimated values
 
     Returns
     -------
     paramdict_out:
-        Dictionary containing derived parameters
+        Dictionary containing derived parameters (including fixed ones)
 
     '''
 
-    keylist = ("a0", "d0", "mu_x0", "mu_y0", "mu_z0",
-               "i", "Omega", "v0", "R0", "alpha_RC")
+    keylist = ["a0", "d0", "mu_x0", "mu_y0", "mu_z0",
+               "i", "Omega", "v0", "R0", "alpha_RC"]
 
-    # Read in dictionary and check what needs fitting, first question: a0 and d0?
-    if all(k in paramdict for k in keylist):
-        print("All parameters in dictionary. Continuing...")
+    # Check that all parameters have input guesses
+    allParamsInput = {}
+    allParamsInput.update(fixedParams)
+    allParamsInput.update(guessParams)
+
+    # Check all parameters given
+    if not all(k in allParamsInput.keys() for k in keylist):
+        raise ValueError("Input parameters missing from both fixedParams and guessParams: "
+                         + [k not in allParamsInput.keys() for k in keylist])
+    elif not all(k in keylist for k in allParamsInput.keys()):
+        raise ValueError("Input parameters not understood: "
+                         + [k not in keylist for k in allParamsInput.keys()])
     else:
-        raise TypeError('Dictionary not complete. Requires all of: ' + keylist)
-    #
+        print('All parameters given and understood. Continuing...')
 
-    if (paramdict["a0"] is not None) and (paramdict["d0"] is not None):
-        if (paramdict["mu_z0"] is not None):
-            fitlist = ["mu_x0", "mu_y0", "i", "Omega", "v0", "R0", "alpha_RC"]
-            params_fit = [paramdict(k) for k in fitlist]
-            res = scipy.optimize.minimize(ObjectiveFunctionRotCurve, params_fit,
-                                          args=(fitlist, data['x'].values, data['y'].values,
-                                                data['muxBinned'].values, data['muyBinned'].values,
-                                                data['muxUncertaintyBinned'].values,
-                                                data['muyUncertaintyBinned'].values,
-                                                data['muxmuyUncertaintyCorrBinned'].values))
-        else:
-            raise TypeError('Functionality not included (yet)')
+    # Fixed centre: this simplifies the calculation as we do not need to recalculate x,y etc
+    if ("a0" in fixedParams.keys()) and ("d0" in fixedParams.keys()):
+        # Put parameter names into lists to avoid any issues with ordering of dicts
+        varyList = [k for k in guessParams.keys()]
+        guessList = [guessParams[k] for k in varyList]
+        res = scipy.optimize.minimize(ObjectiveFunctionRotCurve_XY, guessList,
+                                      args=(fixedParams, varyList,
+                                            data['x'].values, data['y'].values,
+                                            data['muxBinned'].values, data['muyBinned'].values,
+                                            data['muxUncertaintyBinned'].values,
+                                            data['muyUncertaintyBinned'].values,
+                                            data['muxmuyUncertaintyCorrBinned'].values))
     else:
         raise TypeError('Functionality not included (yet)')
