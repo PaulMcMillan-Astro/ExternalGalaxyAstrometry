@@ -2,7 +2,8 @@ from operator import ge
 from pytest import param
 import scipy.optimize
 import numpy as np
-import _AngleConversions
+import warnings
+from _AngleConversions import *
 
 
 def RotCurve_alpha(R, v0, r0, alpha):
@@ -60,11 +61,10 @@ def ObjectiveFunctionRotCurve_XY(params, fixedParams, varyList,
     if paramdict['R0'] < 0.:
         return np.inf
 
-    Rphi_out = _AngleConversions.Orthonormal2Internal(x, y, mux, muy,
-                                                      mux_error, muy_error, mux_muy_corr,
-                                                      paramdict['mu_x0'], paramdict['mu_y0'],
-                                                      paramdict['mu_z0'],
-                                                      paramdict['i'], paramdict['th'])
+    Rphi_out = Orthonormal2Internal(x, y, mux, muy, mux_error, muy_error, mux_muy_corr,
+                                    paramdict['mu_x0'], paramdict['mu_y0'],
+                                    paramdict['mu_z0'],
+                                    paramdict['i'], paramdict['th'])
     R, phi, vR, vphi, vR_error, vphi_error, vR_vphi_corr = Rphi_out
 
     # Model of average motions in the disc
@@ -84,22 +84,93 @@ def ObjectiveFunctionRotCurve_XY(params, fixedParams, varyList,
     return chi_sq
 
 
+def ObjectiveFunctionRotCurve_AD(params, fixedParams, varyList,
+                                 alphadeg, deltadeg, mualphastar, mudelta,
+                                 mualphastar_error, mudelta_error, mualpha_mudelta_corr):
+    '''Function to minimize to perform a least-squares-like estimate of parameters.
+
+    Can be used with minimizing function, with input data in ra and dec.
+
+    The parameters contained the two parameter dictionaries must be:
+
+    mux0, # bulk motion in x direction (mas/yr)
+    muy0, # bulk motion in y direction (mas/yr)
+    i,    # inclination of the disc (degrees)
+    th,   # orientation of the disc (degrees)
+    v0,   # v0 for rotation curve (see above, mas/yr)
+    R0,   # R0 for rotation curve (see above, radians)
+    alpha_RC # alpha for rotation curve (dimensionless)
+
+    Note that everything is scaled to the distance of the galaxy,
+    so R0 is real distance/distance to LMC, and
+    v0 is (velocity in kms)/(distance to LMC in kpc)/(conversion factor from kpc mas/yr to kms)
+
+    Parameters
+    ----------
+    params: list-like
+        Parameters of model, see description above
+    alphadeg,delatdeg: numpy arrays
+        Positions on the sky in ra and dec
+    mualphastar,mudec: numpy arrays
+        Proper motions (mas/yr)
+    mualphastar_error,mudec_error,mualphastar_mudelta_corr: numpy arrays
+        Uncertainties and their correlations (mas/yr, mas/yr, dimensionless, respectively)
+
+    Returns
+    -------
+    chi_sq: float
+        Chi-square like statistic
+    '''
+    if ("a0" in varyList) and ("d0" in varyList):
+        paramdictTmp = dict(zip(varyList, params))  # Easy way of making sure this is done right
+        a0deg = paramdictTmp["a0"]
+        d0deg = paramdictTmp["d0"]
+    else:
+        paramdictTmp = dict(zip(varyList, params))
+        paramdictTmp.update(fixedParams)
+        a0deg = paramdictTmp["a0"]
+        d0deg = paramdictTmp["d0"]
+
+    tmp = Spherical2Orthonormal(alphadeg, deltadeg,
+                                mualphastar, mudelta,
+                                mualphastar_error, mudelta_error,
+                                mualpha_mudelta_corr,
+                                a0deg, d0deg)
+    x, y, mux, muy, mux_error, muy_error, mux_muy_corr = tmp
+    return ObjectiveFunctionRotCurve_XY(params, fixedParams, varyList,
+                                        x, y, mux, muy, mux_error, muy_error, mux_muy_corr)
+
+
 def fitRotationCurveModel(data, fixedParams, guessParams):
     '''Function which fits data to model of a rotating disc
+
+    Parameters of the disc are given in two dictionaries containing the fixed parameters
+    and their values, and the variable parameters and an initial guess of their values.
+    Between the two, all of the following must be defined
+
+    "a0", "d0": The centre of the disc rotation in degrees {Note 1}
+    "mu_x0", "mu_y0": bulk motion in the orthonormal x,y coordinates [mas/yr]
+    "mu_z0": Line-of-sight velocity (positive for motion away) [mas/yr] {Note 2}
+    "i", "Omega": Disc inclination and orientation
+    "v0", "R0", "alpha_RC": Parameters of disc rotation {Note 3}
+
 
     Parameters
     ----------
     data: pandas DataFrame
-        This must contain the columns, ...
-    fixedParams:
-        Dictionary containing the parameters with fixed values and their values
-    guessParams:
-        Dictionary containing parameters to be fit and initial estimated values
+        This must contain the columns, 'x', 'y', 'muxBinned', 'muyBinned',
+        'muxUncertaintyBinned', 'muyUncertaintyBinned', 'muxmuyUncertaintyCorrBinned'
+    fixedParams: dictionary
+        Contains the parameters with fixed values and their values
+    guessParams: dictionary
+        Contains parameters to be fit and initial estimated values
 
     Returns
     -------
-    paramdict_out:
-        Dictionary containing derived parameters (including fixed ones)
+    paramdict_out: Dictionary
+        Dictionary containing derived parameters
+    message:
+        messsage returned from call of scipy.optimize.minimize
 
     '''
 
@@ -116,16 +187,17 @@ def fitRotationCurveModel(data, fixedParams, guessParams):
         raise ValueError("Input parameters missing from both fixedParams and guessParams: "
                          + [k not in allParamsInput.keys() for k in keylist])
     elif not all(k in keylist for k in allParamsInput.keys()):
-        raise ValueError("Input parameters not understood: "
-                         + [k not in keylist for k in allParamsInput.keys()])
+        warnings.warn("Input parameters not understood: "
+                      + [k not in keylist for k in allParamsInput.keys()])
     else:
         print('All parameters given and understood. Continuing...')
 
+    # Put parameter names into lists to avoid any issues with ordering of dicts
+    varyList = [k for k in guessParams.keys()]
+    guessList = [guessParams[k] for k in varyList]
+
     # Fixed centre: this simplifies the calculation as we do not need to recalculate x,y etc
     if ("a0" in fixedParams.keys()) and ("d0" in fixedParams.keys()):
-        # Put parameter names into lists to avoid any issues with ordering of dicts
-        varyList = [k for k in guessParams.keys()]
-        guessList = [guessParams[k] for k in varyList]
         res = scipy.optimize.minimize(ObjectiveFunctionRotCurve_XY, guessList,
                                       args=(fixedParams, varyList,
                                             data['x'].values, data['y'].values,
@@ -134,4 +206,23 @@ def fitRotationCurveModel(data, fixedParams, guessParams):
                                             data['muyUncertaintyBinned'].values,
                                             data['muxmuyUncertaintyCorrBinned'].values))
     else:
-        raise TypeError('Functionality not included (yet)')
+        # Convert to ra and dec, so that each iteration can make conversion to x,y itself
+        alphadeg, deltadeg, mualphastar, mudelta, \
+            mualphastar_error, mudelta_error, \
+            mualpha_mudelta_corr = Orthonormal2Spherical(data['x'].values,
+                                                         data['y'].values,
+                                                         data['muxBinned'].values,
+                                                         data['muyBinned'].values,
+                                                         data['muxUncertaintyBinned'].values,
+                                                         data['muyUncertaintyBinned'].values,
+                                                         data['muxmuyUncertaintyCorrBinned'].values,
+                                                         alpha0deg=fixedParams["a0"],
+                                                         delta0deg=fixedParams["d0"])
+        res = scipy.optimize.minimize(ObjectiveFunctionRotCurve_AD, guessList,
+                                      args=(fixedParams, varyList,
+                                            alphadeg, deltadeg, mualphastar, mudelta,
+                                            mualphastar_error, mudelta_error,
+                                            mualpha_mudelta_corr))
+    if not res.success:
+        warnings.warn("minimization did not complete successfully")
+    return dict(zip(varyList, res.x)), res.message
