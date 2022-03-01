@@ -148,12 +148,20 @@ def fitRotationCurveModel(data, fixedParams, guessParams):
     and their values, and the variable parameters and an initial guess of their values.
     Between the two, all of the following must be defined
 
-    "a0", "d0": The centre of the disc rotation in degrees {Note 1}
+    "a0", "d0": The centre of the disc rotation in degrees (Note 1)
     "mu_x0", "mu_y0": bulk motion in the orthonormal x,y coordinates [mas/yr]
-    "mu_z0": Line-of-sight velocity (positive for motion away) [mas/yr] {Note 2}
+    "mu_z0": Line-of-sight velocity, positive for motion away [mas/yr] (Note 2)
     "i", "Omega": Disc inclination and orientation
-    "v0", "R0", "alpha_RC": Parameters of disc rotation {Note 3}
+    "v0", "R0", "alpha_RC": Parameters of disc rotation (Note 3)
 
+    Note 1: If a0 and d0 are to be fit then the initial guess values must be the same as those
+        used to find the input values x, y, etc. in the orthonormal coordinate system.
+    Note 2: This is placed on the same scale as the proper motions, so depends on the distance to
+        the centre of the LMC. For a line of sight velocity vlos km/s, and a galaxy at a
+        distance Dgal, this would be vlos/Dgal/4.7403885, where the last value is a conversion
+        factor between mas/yr and kms/kpc (stored as maskpc2kms in this package)
+
+    Note 3: Rotation curve is of the form v0/(1+r0/R)^alpha)^(1/alpha).
 
     Parameters
     ----------
