@@ -5,7 +5,32 @@ from ._GeometricFitting import findGradientsParametersFromData
 
 
 def findMedianRobustCovariance(mux, muy):
-    '''Provides medians and a robust estimate of the covariance matrix of two input arrays'''
+    '''Provides medians and a robust estimate of the covariance matrix of two input arrays
+
+    Covarience matrix is estimated by calculating the covarience of all values within 4 Robust
+    Scatter Estimates (RSE) of the median in both mux and muy. The RSE is calculated as
+
+    RSE = 0.390152 * (Q(0.9) - Q(0.1))
+
+    for quantiles Q.
+
+    Parameters
+    ----------
+    mux: array of floats
+        values for calculation
+    muy: array of floats
+        values for calculation
+
+    Returns
+    -------
+    pmx0: float
+        median in mux
+    pmy0: float
+        median in muy
+    covar: array of float
+        Robust covarience estimate. Dimensions (2,2)
+
+    '''
     pmx0 = np.median(mux)
     pmy0 = np.median(muy)
 

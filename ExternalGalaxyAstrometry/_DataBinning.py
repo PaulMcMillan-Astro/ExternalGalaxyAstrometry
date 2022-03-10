@@ -6,7 +6,8 @@ from scipy.optimize import minimize
 def minus_logLikelihood(mu_sig, x, xCov):
     '''-logLikelihood, minimized to estimate true mean and dispersion (2D)
 
-    Used by binDataOnSky
+    Used by binDataOnSky. The likelihood is Gaussian with quoted mean and covarience
+    matrix (described with 5 parameters).
 
     Parameters
     ----------
@@ -19,6 +20,8 @@ def minus_logLikelihood(mu_sig, x, xCov):
 
     Returns
     -------
+    minusLogLike: float
+        - log(likelihood)
     '''
 
     if mu_sig[2] < 0.:
