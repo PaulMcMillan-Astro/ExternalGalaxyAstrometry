@@ -46,9 +46,7 @@ def findGalaxyParametersFromGradients(vx, dmxdx, dmxdy, vy, dmydx, dmydy,
     for i in range(150):  # iterative solution
         E, F, G, H = EFGHgivenDirectVals(vx, dmxdx, dmxdy, vy, dmydx, dmydy, a, b)
         vz, c, Om, om = vzcOmomgivenEFGH(E, F, G, H)
-        # print(vz, c, Om, om)
         i = igivenc(c)
-        # print(i)
         a, b = abgiveniOm(i, Om)
     return vx, vy, vz, np.rad2deg(i), np.rad2deg(Om), om
 
@@ -65,20 +63,43 @@ def ObjectFuncForGradientFinding(params, mu, x, y):
     return np.sum(chi_2_good)
 
 
-def findGradientsParametersFromData(data, muxname='mux_decorr', muyname='muy_decorr'):
-    '''Given input proper motion data, estiamtes properties of a disc galaxy
+def findGradientsParametersFromData(data, muxname='mux', muyname='muy'):
+    '''Given input proper motion data, estimates properties of a disc galaxy
 
-    Input: data is a pandas dataframe with columns:
-        'x','y' (angles on sky)
-        muxname,muyname (name for proper motions in those directions)
+    Parameters
+    ----------
+    data: pandas DataFrame
+        Must contain columns 'x','y' (Orthographic angles on sky in radians)
+        and columns with names given as input parameters muxname, muyname
+        (proper motions in those directions, units mas/yr)
+    muxname: string, default 'mux'
+        Name of DataFrame column containing proper motion in x
+    muyname: string, default 'muy'
+        Name of DataFrame column containing proper motion in y
 
-    outputs: vx,vy,vz,ideg,Omdeg,om,dmxdx,dmxdy,dmydx,dmydy (floats)
+    Returns
+    -------
+    vx: float
+        bulk motion in x direction in units of proper motion
+    vy: float
+        bulk motion in y direction in units of proper motion
+    vz: float
+        bulk motion in z direction in units of proper motion
+    ideg: float
+        disc inclination (in degrees)
+    Omdeg: float
+        orientation of disc (in degrees)
+    om: float
+        angular velocity (units: proper motion/radians)
+    dmxdx: float
+        the gradient in proper motion mux with respect to x (mas/yr/radian)
+    dmxdy: float
+        the gradient in proper motion mux with respect to y (mas/yr/radian)
+    dmydx: float
+        the gradient in proper motion muy with respect to x (mas/yr/radian)
+    dmydy: float
+        the gradient in proper motion muy with respect to y (mas/yr/radian)
 
-    vx,vy,vz are bulk motions in x,y,z direction (z = line-of-sight) in units of proper motion
-    ideg is inclination (in degrees)
-    Omdeg is orientation of disc (in degrees)
-    om is angular velocity (units: proper motion/radians)
-    the dmA/dB is the gradient in proper motion mA with respect to direction B
     '''
     parameters0 = np.array([np.mean(data[muxname]), -1.3, -3.])
     # Arbitrary-ish values, might be best to fix at some point

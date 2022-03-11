@@ -54,7 +54,7 @@ def minus_logLikelihood(mu_sig, x, xCov):
 def estimate_mean_dispersion_2D(x, xCov):
     '''Estimate mean and intrinsic dispersion assuming 2D Gaussian
 
-    Used by binDataOnSky to provide an initial guess
+    Used by binDataOnSky to determine values for a single on-sky pixel.
 
     Parameters
     ----------
