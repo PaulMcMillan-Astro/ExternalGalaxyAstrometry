@@ -2,6 +2,7 @@
 from an external rotating disc galaxy.'''
 from ._AngleConversions import *
 from ._GeometricFitting import findGradientsParametersFromData
+from ._DataBinning import binDataOnSky
 
 
 def findMedianRobustCovariance(mux, muy):
