@@ -6,4 +6,4 @@ This code grew out of work done for ["Gaia Data Release 2. Kinematics of globula
 
 Amendment to include line-of-sight velocities - currently pending - was done as part of work towards ["Kinematic analysis of the Large Magellanic Cloud using Gaia DR3"](https://ui.adsabs.harvard.edu/abs/2023A%26A...669A..91J/abstract).
 
-The code has been made public for convenience of sharing. It is neither complete nor perfect and comes with promise that it will become either.
+The code has been made public for convenience of sharing. It is neither complete nor perfect and comes with no promise that it will become either.
