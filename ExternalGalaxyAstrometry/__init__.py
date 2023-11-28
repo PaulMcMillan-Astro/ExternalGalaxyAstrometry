@@ -2,7 +2,9 @@
 from an external rotating disc galaxy.'''
 from ._AngleConversions import *
 from ._GeometricFitting import findGradientsParametersFromData
-from ._DataBinning import binDataOnSky
+from ._DataBinning import binDataOnSky, estimate_mean_dispersion_2D
+from ._FullFitting import fitRotationCurveModel
+
 
 
 def findMedianRobustCovariance(mux, muy):
@@ -101,6 +103,10 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
     maskFinalMagnitude = (data.phot_g_mean_mag < defaultMagnitudeCut)
     maskpickpmLMC = maskIniParallax & maskIniMagnitude & maskIniPosition
 
+    if verbose:
+        print(len(data[maskIniPosition]), ' stars in position sample')
+        print(len(data[maskpickpmLMC]), ' stars in initial sample')
+
     pmxLMC0, pmyLMC0, covar = findMedianRobustCovariance(mux[maskpickpmLMC], muy[maskpickpmLMC])
     icovar = np.linalg.inv(covar)
 
@@ -162,6 +168,4 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
     if verbose:
         print(len(data[maskLMCfinal]), 'stars in final sample')
 
-    data['mux'] = mux
-    data['muy'] = muy
     return data[maskLMCfinal]

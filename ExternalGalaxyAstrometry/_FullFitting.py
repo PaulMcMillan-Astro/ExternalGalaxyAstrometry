@@ -3,17 +3,18 @@ from pytest import param
 import scipy.optimize
 import numpy as np
 import warnings
-from _AngleConversions import *
+from ._AngleConversions import *
 
 
 def RotCurve_alpha(R, v0, r0, alpha):
-    '''Rotation curve of a simple functional form: v0/(1+r0/R)^alpha)^(1/alpha)'''
-    return v0/(1.+(r0/R)**alpha)**(1./alpha)
+    """Rotation curve of a simple functional form: v0/(1+r0/R)^alpha)^(1/alpha)"""
+    return v0 / (1.0 + (r0 / R) ** alpha) ** (1.0 / alpha)
 
 
-def ObjectiveFunctionRotCurve_XY(params, fixedParams, varyList,
-                                 x, y, mux, muy, mux_error, muy_error, mux_muy_corr):
-    '''Function to minimize to perform a least-squares-like estimate of parameters.
+def ObjectiveFunctionRotCurve_XY(
+    params, fixedParams, varyList, x, y, mux, muy, mux_error, muy_error, mux_muy_corr
+):
+    """Function to minimize to perform a least-squares-like estimate of parameters.
 
     Can be used with minimizing function.
 
@@ -22,7 +23,7 @@ def ObjectiveFunctionRotCurve_XY(params, fixedParams, varyList,
     mux0, # bulk motion in x direction (mas/yr)
     muy0, # bulk motion in y direction (mas/yr)
     i,    # inclination of the disc (degrees)
-    th,   # orientation of the disc (degrees)
+    Omega,# orientation of the disc (degrees)
     v0,   # v0 for rotation curve (see above, mas/yr)
     R0,   # R0 for rotation curve (see above, radians)
     alpha_RC # alpha for rotation curve (dimensionless)
@@ -46,48 +47,82 @@ def ObjectiveFunctionRotCurve_XY(params, fixedParams, varyList,
     -------
     chi_sq: float
         Chi-square like statistic
-    '''
-    keylist = ["a0", "d0", "mu_x0", "mu_y0", "mu_z0",
-               "i", "Omega", "v0", "R0", "alpha_RC"]
+    """
+    
+    keylist = [
+        "a0",
+        "d0",
+        "mu_x0",
+        "mu_y0",
+        "mu_z0",
+        "i",
+        "Omega",
+        "v0",
+        "R0",
+        "alpha_RC",
+    ]
 
     paramdict = dict(zip(varyList, params))
     paramdict.update(fixedParams)
 
     if not all(k in paramdict.keys() for k in keylist):
-        raise ValueError("Input parameters missing from both fixedParams and guessParams: "
-                         + [k not in paramdict.keys() for k in keylist])
+        raise ValueError(
+            "Input parameters missing from both fixedParams and guessParams: "
+            + [k not in paramdict.keys() for k in keylist]
+        )
 
     # mux0, muy0, i, th, v0, R0, alpha_RC = params
-    if paramdict['R0'] < 0.:
-        return np.inf
+    if paramdict["R0"] < 0.0:
+        return 1e20
 
-    Rphi_out = Orthonormal2Internal(x, y, mux, muy, mux_error, muy_error, mux_muy_corr,
-                                    paramdict['mu_x0'], paramdict['mu_y0'],
-                                    paramdict['mu_z0'],
-                                    paramdict['i'], paramdict['th'])
+    Rphi_out = Orthonormal2Internal(
+        x,
+        y,
+        mux,
+        muy,
+        paramdict["mu_x0"],
+        paramdict["mu_y0"],
+        paramdict["mu_z0"],
+        paramdict["i"],
+        paramdict["Omega"],
+        mux_error,
+        muy_error,
+        mux_muy_corr
+    )
     R, phi, vR, vphi, vR_error, vphi_error, vR_vphi_corr = Rphi_out
 
     # Model of average motions in the disc
-    Vphi_mod = RotCurve_alpha(R, paramdict['v0'], paramdict['R0'], paramdict['alpha_RC'])
-    VR_mod = 0.*np.ones_like(R)
+    Vphi_mod = RotCurve_alpha(
+        R, paramdict["v0"], paramdict["R0"], paramdict["alpha_RC"]
+    )
+    VR_mod = 0.0 * np.ones_like(R)
 
-    dv = np.vstack([vR-VR_mod, vphi-Vphi_mod]).T
+    dv = np.vstack([vR - VR_mod, vphi - Vphi_mod]).T
     Cov = np.zeros([len(R), 2, 2])
     Cov[:, 0, 0] = vR_error**2
-    Cov[:, 0, 1] = vR_error*vphi_error*vR_vphi_corr
+    Cov[:, 0, 1] = vR_error * vphi_error * vR_vphi_corr
     Cov[:, 1, 0] = Cov[:, 0, 1]
     Cov[:, 1, 1] = vphi_error**2
     invCov = np.linalg.inv(Cov)
     # chi^2 = dv' C^(-1) dv
-    chi_sq_terms = np.einsum('li,li->l', dv, np.einsum('lij,lj->li', invCov, dv))
+    chi_sq_terms = np.einsum("li,li->l", dv, np.einsum("lij,lj->li", invCov, dv))
     chi_sq = np.sum(chi_sq_terms[np.isfinite(chi_sq_terms)])
     return chi_sq
 
 
-def ObjectiveFunctionRotCurve_AD(params, fixedParams, varyList,
-                                 alphadeg, deltadeg, mualphastar, mudelta,
-                                 mualphastar_error, mudelta_error, mualpha_mudelta_corr):
-    '''Function to minimize to perform a least-squares-like estimate of parameters.
+def ObjectiveFunctionRotCurve_AD(
+    params,
+    fixedParams,
+    varyList,
+    alphadeg,
+    deltadeg,
+    mualphastar,
+    mudelta,
+    mualphastar_error,
+    mudelta_error,
+    mualpha_mudelta_corr,
+):
+    """Function to minimize to perform a least-squares-like estimate of parameters.
 
     Can be used with minimizing function, with input data in ra and dec.
 
@@ -120,9 +155,11 @@ def ObjectiveFunctionRotCurve_AD(params, fixedParams, varyList,
     -------
     chi_sq: float
         Chi-square like statistic
-    '''
+    """
     if ("a0" in varyList) and ("d0" in varyList):
-        paramdictTmp = dict(zip(varyList, params))  # Easy way of making sure this is done right
+        paramdictTmp = dict(
+            zip(varyList, params)
+        )  # Easy way of making sure this is done right
         a0deg = paramdictTmp["a0"]
         d0deg = paramdictTmp["d0"]
     else:
@@ -131,18 +168,34 @@ def ObjectiveFunctionRotCurve_AD(params, fixedParams, varyList,
         a0deg = paramdictTmp["a0"]
         d0deg = paramdictTmp["d0"]
 
-    tmp = Spherical2Orthonormal(alphadeg, deltadeg,
-                                mualphastar, mudelta,
-                                mualphastar_error, mudelta_error,
-                                mualpha_mudelta_corr,
-                                a0deg, d0deg)
+    tmp = Spherical2Orthonormal(
+        alphadeg,
+        deltadeg,
+        mualphastar,
+        mudelta,
+        mualphastar_error,
+        mudelta_error,
+        mualpha_mudelta_corr,
+        a0deg,
+        d0deg,
+    )
     x, y, mux, muy, mux_error, muy_error, mux_muy_corr = tmp
-    return ObjectiveFunctionRotCurve_XY(params, fixedParams, varyList,
-                                        x, y, mux, muy, mux_error, muy_error, mux_muy_corr)
+    return ObjectiveFunctionRotCurve_XY(
+        params,
+        fixedParams,
+        varyList,
+        x,
+        y,
+        mux,
+        muy,
+        mux_error,
+        muy_error,
+        mux_muy_corr,
+    )
 
 
 def fitRotationCurveModel(data, fixedParams, guessParams):
-    '''Function which fits data to model of a rotating disc
+    """Function which fits data to model of a rotating disc
 
     Parameters of the disc are given in two dictionaries containing the fixed parameters
     and their values, and the variable parameters and an initial guess of their values.
@@ -180,10 +233,20 @@ def fitRotationCurveModel(data, fixedParams, guessParams):
     message:
         messsage returned from call of scipy.optimize.minimize
 
-    '''
+    """
 
-    keylist = ["a0", "d0", "mu_x0", "mu_y0", "mu_z0",
-               "i", "Omega", "v0", "R0", "alpha_RC"]
+    keylist = [
+        "a0",
+        "d0",
+        "mu_x0",
+        "mu_y0",
+        "mu_z0",
+        "i",
+        "Omega",
+        "v0",
+        "R0",
+        "alpha_RC",
+    ]
 
     # Check that all parameters have input guesses
     allParamsInput = {}
@@ -192,13 +255,17 @@ def fitRotationCurveModel(data, fixedParams, guessParams):
 
     # Check all parameters given
     if not all(k in allParamsInput.keys() for k in keylist):
-        raise ValueError("Input parameters missing from both fixedParams and guessParams: "
-                         + [k not in allParamsInput.keys() for k in keylist])
+        raise ValueError(
+            "Input parameters missing from both fixedParams and guessParams: "
+            + [k not in allParamsInput.keys() for k in keylist]
+        )
     elif not all(k in keylist for k in allParamsInput.keys()):
-        warnings.warn("Input parameters not understood: "
-                      + [k not in keylist for k in allParamsInput.keys()])
+        warnings.warn(
+            "Input parameters not understood: "
+            + [k not in keylist for k in allParamsInput.keys()]
+        )
     else:
-        print('All parameters given and understood. Continuing...')
+        print("All parameters given and understood. Continuing...")
 
     # Put parameter names into lists to avoid any issues with ordering of dicts
     varyList = [k for k in guessParams.keys()]
@@ -206,31 +273,59 @@ def fitRotationCurveModel(data, fixedParams, guessParams):
 
     # Fixed centre: this simplifies the calculation as we do not need to recalculate x,y etc
     if ("a0" in fixedParams.keys()) and ("d0" in fixedParams.keys()):
-        res = scipy.optimize.minimize(ObjectiveFunctionRotCurve_XY, guessList,
-                                      args=(fixedParams, varyList,
-                                            data['x'].values, data['y'].values,
-                                            data['muxBinned'].values, data['muyBinned'].values,
-                                            data['muxUncertaintyBinned'].values,
-                                            data['muyUncertaintyBinned'].values,
-                                            data['muxmuyUncertaintyCorrBinned'].values))
+        res = scipy.optimize.minimize(
+            ObjectiveFunctionRotCurve_XY,
+            guessList,
+            args=(
+                fixedParams,
+                varyList,
+                data["x"].values,
+                data["y"].values,
+                data["muxBinned"].values,
+                data["muyBinned"].values,
+                data["muxUncertaintyBinned"].values,
+                data["muyUncertaintyBinned"].values,
+                data["muxmuyUncertaintyCorrBinned"].values,
+            ),
+            options={"maxiter": 100000},
+        )
     else:
         # Convert to ra and dec, so that each iteration can make conversion to x,y itself
-        alphadeg, deltadeg, mualphastar, mudelta, \
-            mualphastar_error, mudelta_error, \
-            mualpha_mudelta_corr = Orthonormal2Spherical(data['x'].values,
-                                                         data['y'].values,
-                                                         data['muxBinned'].values,
-                                                         data['muyBinned'].values,
-                                                         data['muxUncertaintyBinned'].values,
-                                                         data['muyUncertaintyBinned'].values,
-                                                         data['muxmuyUncertaintyCorrBinned'].values,
-                                                         alpha0deg=fixedParams["a0"],
-                                                         delta0deg=fixedParams["d0"])
-        res = scipy.optimize.minimize(ObjectiveFunctionRotCurve_AD, guessList,
-                                      args=(fixedParams, varyList,
-                                            alphadeg, deltadeg, mualphastar, mudelta,
-                                            mualphastar_error, mudelta_error,
-                                            mualpha_mudelta_corr))
+        (
+            alphadeg,
+            deltadeg,
+            mualphastar,
+            mudelta,
+            mualphastar_error,
+            mudelta_error,
+            mualpha_mudelta_corr,
+        ) = Orthonormal2Spherical(
+            data["x"].values,
+            data["y"].values,
+            data["muxBinned"].values,
+            data["muyBinned"].values,
+            data["muxUncertaintyBinned"].values,
+            data["muyUncertaintyBinned"].values,
+            data["muxmuyUncertaintyCorrBinned"].values,
+            alpha0deg=fixedParams["a0"],
+            delta0deg=fixedParams["d0"],
+        )
+        res = scipy.optimize.minimize(
+            ObjectiveFunctionRotCurve_AD,
+            guessList,
+            args=(
+                fixedParams,
+                varyList,
+                alphadeg,
+                deltadeg,
+                mualphastar,
+                mudelta,
+                mualphastar_error,
+                mudelta_error,
+                mualpha_mudelta_corr,
+            ),
+            options={"maxiter": 100000}
+        )
     if not res.success:
         warnings.warn("minimization did not complete successfully")
     return dict(zip(varyList, res.x)), res.message
