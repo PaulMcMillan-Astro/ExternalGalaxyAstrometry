@@ -12,7 +12,8 @@ def RotCurve_alpha(R, v0, r0, alpha):
 
 
 def ObjectiveFunctionRotCurve_XY(
-    params, fixedParams, varyList, x, y, mux, muy, mux_error, muy_error, mux_muy_corr
+    params, fixedParams, varyList, x, y, mux, muy, mux_error, muy_error, mux_muy_corr,
+    systematic_uncertainty=0.
 ):
     """Function to minimize to perform a least-squares-like estimate of parameters.
 
@@ -42,6 +43,8 @@ def ObjectiveFunctionRotCurve_XY(
         Proper motions (mas/yr)
     mux_error,muy_error,mux_muy_corr: numpy arrays
         Uncertainties and their correlations (mas/yr, mas/yr, dimensionless, respectively)
+    systematic_uncertainty: float
+        Systematic uncertainty to be added to the proper motion uncertainties
 
     Returns
     -------
@@ -85,8 +88,8 @@ def ObjectiveFunctionRotCurve_XY(
         paramdict["mu_z0"],
         paramdict["i"],
         paramdict["Omega"],
-        mux_error,
-        muy_error,
+        np.sqrt(mux_error**2 + systematic_uncertainty**2),
+        np.sqrt(muy_error**2 + systematic_uncertainty**2),
         mux_muy_corr
     )
     R, phi, vR, vphi, vR_error, vphi_error, vR_vphi_corr = Rphi_out
@@ -121,6 +124,7 @@ def ObjectiveFunctionRotCurve_AD(
     mualphastar_error,
     mudelta_error,
     mualpha_mudelta_corr,
+    systematic_uncertainty=0.
 ):
     """Function to minimize to perform a least-squares-like estimate of parameters.
 
@@ -150,6 +154,8 @@ def ObjectiveFunctionRotCurve_AD(
         Proper motions (mas/yr)
     mualphastar_error,mudec_error,mualphastar_mudelta_corr: numpy arrays
         Uncertainties and their correlations (mas/yr, mas/yr, dimensionless, respectively)
+    systematic_uncertainty: float
+        Systematic uncertainty to be added to the proper motion uncertainties
 
     Returns
     -------
@@ -191,10 +197,11 @@ def ObjectiveFunctionRotCurve_AD(
         mux_error,
         muy_error,
         mux_muy_corr,
+        systematic_uncertainty,
     )
 
 
-def fitRotationCurveModel(data, fixedParams, guessParams):
+def fitRotationCurveModel(data, fixedParams, guessParams, systematic_uncertainty=0.):
     """Function which fits data to model of a rotating disc
 
     Parameters of the disc are given in two dictionaries containing the fixed parameters
@@ -225,6 +232,8 @@ def fitRotationCurveModel(data, fixedParams, guessParams):
         Contains the parameters with fixed values and their values
     guessParams: dictionary
         Contains parameters to be fit and initial estimated values
+    systematic_uncertainty: float
+        Systematic uncertainty to be added to the proper motion uncertainties
 
     Returns
     -------
@@ -286,6 +295,7 @@ def fitRotationCurveModel(data, fixedParams, guessParams):
                 data["muxUncertaintyBinned"].values,
                 data["muyUncertaintyBinned"].values,
                 data["muxmuyUncertaintyCorrBinned"].values,
+                systematic_uncertainty,
             ),
             options={"maxiter": 100000},
         )
@@ -307,8 +317,8 @@ def fitRotationCurveModel(data, fixedParams, guessParams):
             data["muxUncertaintyBinned"].values,
             data["muyUncertaintyBinned"].values,
             data["muxmuyUncertaintyCorrBinned"].values,
-            alpha0deg=fixedParams["a0"],
-            delta0deg=fixedParams["d0"],
+            alpha0deg=guessParams["a0"],
+            delta0deg=guessParams["d0"],
         )
         res = scipy.optimize.minimize(
             ObjectiveFunctionRotCurve_AD,
@@ -323,6 +333,7 @@ def fitRotationCurveModel(data, fixedParams, guessParams):
                 mualphastar_error,
                 mudelta_error,
                 mualpha_mudelta_corr,
+                systematic_uncertainty,
             ),
             options={"maxiter": 100000}
         )

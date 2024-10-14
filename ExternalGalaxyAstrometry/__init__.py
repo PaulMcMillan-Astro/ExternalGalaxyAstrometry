@@ -3,7 +3,7 @@ from an external rotating disc galaxy.'''
 from ._AngleConversions import *
 from ._GeometricFitting import findGradientsParametersFromData
 from ._DataBinning import binDataOnSky, estimate_mean_dispersion_2D
-from ._FullFitting import fitRotationCurveModel
+from ._FullFitting import fitRotationCurveModel 
 
 
 
@@ -128,7 +128,13 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
         print('median parallax of stars after initial filter:', median_parallax, 'mas')
 
     # Return sample if they don't want to remove correlations
-    if adjustForCorrelations is False:
+    # or if some of the correlation fields are empty
+    missingCorr = (np.sum(np.isnan(data.parallax_pmra_corr.values)) +
+                     np.sum(np.isnan(data.parallax_pmdec_corr.values)))
+    if adjustForCorrelations is False or missingCorr > 0:
+        print('No correlation adjustment')
+        if verbose:
+            print('Number of missing correlation fields:', missingCorr)
         data['mux'] = mux
         data['muy'] = muy
         maskmyLMC = (maskIniParallax & maskpmLMC) & maskFinalMagnitude
@@ -143,7 +149,7 @@ def filterUsingProperMotions(data, a0=a0vdM, d0=d0vdM,
                     data.parallax_pmdec_corr.values*data.pmdec_error.values /
                     data.parallax_error.values
                     * (median_parallax-data.parallax.values))
-
+    
     _, _, mux, muy = Spherical2Orthonormal(data.ra.values, data.dec.values,
                                            pmra_decorr,
                                            pmdec_decorr)

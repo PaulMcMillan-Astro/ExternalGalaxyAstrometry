@@ -9,3 +9,6 @@ docs/build/
 .ipynb_checkpoints
 .virtual_documents
 code-packaging-reve4829fc.pdf
+int3Results
+*.csv
+*.h5

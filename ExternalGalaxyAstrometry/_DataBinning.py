@@ -107,7 +107,8 @@ def binDataOnSky(data, a0, d0, angmax=8, statisticBins=40, verbose=True):
     Parameters
     ----------
     data: pandas DataFrame
-        Must contain columns 'x','y','mux','muy','mux_error','muy_error','mux_muy_corr'
+        Must contain columns 'ra', 'dec', 'pmra', 'pmdec, 'pmra_error', 'pmdec_error', 
+        'pmra_pmdec_corr', 'parallax', 'parallax_error'
     angmax: float (default 8.)
         Data is binned between -angmax and angmax in x & y, where this value is in degrees
     statisticBins: int (default 40)
@@ -121,7 +122,7 @@ def binDataOnSky(data, a0, d0, angmax=8, statisticBins=40, verbose=True):
         Contains columns 'x', 'y', 'muxBinned', 'muyBinned',
         'muxDispersionBinned', 'muyDispersionBinned', 'muxmuyDispersionCorrBinned',
         'muxUncertaintyBinned', 'muyUncertaintyBinned':, 'muxmuyUncertaintyCorrBinned',
-        'countBinned'
+        'countBinned', 'parBinned', 'parUncertaintyBinned'
 
     """
 
@@ -158,6 +159,7 @@ def binDataOnSky(data, a0, d0, angmax=8, statisticBins=40, verbose=True):
 
     muxBinned = np.zeros([statisticBins, statisticBins])
     muyBinned = np.zeros([statisticBins, statisticBins])
+    parBinned = np.zeros([statisticBins, statisticBins])
 
     muxDispersionBinned = np.zeros([statisticBins, statisticBins])
     muyDispersionBinned = np.zeros([statisticBins, statisticBins])
@@ -166,6 +168,8 @@ def binDataOnSky(data, a0, d0, angmax=8, statisticBins=40, verbose=True):
     muxUncertaintyBinned = np.zeros([statisticBins, statisticBins])
     muyUncertaintyBinned = np.zeros([statisticBins, statisticBins])
     muxmuyUncertaintyCorrBinned = np.zeros([statisticBins, statisticBins])
+    parUncertaintyBinned = np.zeros([statisticBins, statisticBins])
+
     countBinned = np.zeros([statisticBins, statisticBins])
 
     xMedianBins = np.linspace(-angmax, angmax, statisticBins + 1)
@@ -212,13 +216,17 @@ def binDataOnSky(data, a0, d0, angmax=8, statisticBins=40, verbose=True):
                 muxmuyUncertaintyCorrBinned[i, j] = covUncertainty[1, 0] / (
                     muxUncertaintyBinned[i, j] * muyUncertaintyBinned[i, j]
                 )
+                parBinned[i, j], sow = np.average(data.parallax.values[mask],
+                                                  weights=1./data.parallax_error.values[mask]**2,
+                                                  returned=True)
+                parUncertaintyBinned[i, j] = 1./np.sqrt(sow)
             else:
                 muxBinned[i, j], muxDispersionBinned[i, j] = np.nan, np.nan
                 muyBinned[i, j], muyDispersionBinned[i, j] = np.nan, np.nan
             if verbose:
                 print(str(i) + "," + str(j) + "-", end="")
         if verbose:
-            print(".", end="")
+            print(".", end="\n")
     if verbose:
         print("")
 
@@ -233,6 +241,8 @@ def binDataOnSky(data, a0, d0, angmax=8, statisticBins=40, verbose=True):
         "muxUncertaintyBinned": muxUncertaintyBinned.flatten(),
         "muyUncertaintyBinned": muyUncertaintyBinned.flatten(),
         "muxmuyUncertaintyCorrBinned": muxmuyUncertaintyCorrBinned.flatten(),
+        "parBinned": parBinned.flatten(),
+        "parUncertaintyBinned": parUncertaintyBinned.flatten(),
         "countBinned": countBinned.flatten(),
     }
 
